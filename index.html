@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ENGLISH QUEST AI — Prototype</title>
+<style>
+  :root{
+    --bg-color:#63c7f5;
+    --accent:#ffd83d;
+    --accent-dark:#a65014;
+    --panel-bg:rgba(30,45,75,.96);
+    --hud-bg:rgba(25,35,60,.92);
+    --canva-cover:#071025; /* color to cover Canva text area */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:#111827;color:#fff;overflow:hidden}
+  #game{width:100vw;height:100vh;position:relative;display:block;background:linear-gradient(var(--bg-color) 0 62%,#79c943 62% 100%);background-size:cover;background-position:center}
+  .slide{display:none;width:100%;height:100%;position:relative}
+  .slide.active{display:block}
+  /* background image per slide (set via data-bg) */
+  .slide[data-bg]{ background-size:cover; background-position:center; }
+  /* Top Canva cover */
+  .canva-cover{position:absolute;left:0;right:0;top:0;height:70px;background:var(--canva-cover);opacity:0.95;z-index:40;display:flex;align-items:center;justify-content:flex-end;padding:8px 18px;color:#fff;font-weight:800;gap:12px}
+  .canva-cover small{opacity:.85;font-weight:700}
+  /* HUD */
+  .hud{ position:absolute;top:18px;left:18px;right:18px;display:flex;justify-content:space-between;align-items:center;z-index:30;pointer-events:none}
+  .hud-box{ pointer-events:auto;background:var(--hud-bg);border:3px solid var(--accent);border-radius:14px;padding:9px 15px;font-weight:900;box-shadow:0 5px 0 rgba(0,0,0,.25)}
+  /* Titles and elements */
+  .title{ position:absolute;top:12%;width:100%;text-align:center;font-size:clamp(34px,6vw,78px);font-weight:1000;color:var(--accent);text-shadow:5px 5px 0 #9a3b15,8px 8px 0 #fff;z-index:25}
+  .subtitle{ position:absolute;top:23%;width:100%;text-align:center;font-size:clamp(18px,3vw,36px);font-weight:900;color:#fff;text-shadow:3px 3px #1c4c75;z-index:25}
+  .hero{ position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);font-size:clamp(64px,10vw,150px);filter:drop-shadow(0 9px 0 rgba(0,0,0,.25));z-index:25}
+  .mission{ position:absolute;left:50%;bottom:22%;transform:translateX(-50%);background:#fff3b0;color:#263238;border:5px solid #7d4b1f;border-radius:18px;padding:14px 22px;min-width:min(720px,80%);text-align:center;font-weight:900;font-size:clamp(14px,2vw,22px);z-index:25}
+  .btn{ border:4px solid #5a260d;border-radius:16px;background:var(--accent);color:#572000;font-weight:1000;font-size:clamp(16px,2.5vw,28px);padding:12px 28px;cursor:pointer;box-shadow:0 7px 0 var(--accent-dark);transition:.12s;display:inline-block}
+  .btn:hover{transform:translateY(4px);box-shadow:0 3px 0 var(--accent-dark)}
+  .center-btn{position:absolute;left:50%;bottom:9%;transform:translateX(-50%);z-index:25}
+  .panel{ position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(960px,88%);background:var(--panel-bg);border:6px solid var(--accent);border-radius:25px;padding:30px;box-shadow:0 12px 0 rgba(0,0,0,.25);text-align:center;z-index:25}
+  .panel h1{margin:0 0 12px;color:var(--accent);font-size:clamp(26px,4vw,48px)}
+  .rules{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:18px 0}
+  .rule{background:#ffffff;color:#24324a;border-radius:15px;padding:14px;font-weight:800}
+  .world-title{ position:absolute;top:11%;width:100%;text-align:center;font-size:clamp(30px,5vw,58px);font-weight:1000;color:#fff;text-shadow:4px 4px #3c7d20;z-index:25}
+  .path{position:absolute;left:10%;right:10%;top:54%;height:15px;background:#8b572a;border-radius:20px;z-index:24}
+  .level{ position:absolute;top:45%;width:90px;height:90px;border-radius:50%; background:var(--accent);border:6px solid #6a3716;color:#4b250f;font-size:28px;font-weight:1000;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 0 #6a3716;z-index:25}
+  .l1{left:15%}.l2{left:42%}.l3{left:69%}
+  .level small{position:absolute;top:100%;width:160px;font-size:15px;color:white;margin-top:12px}
+  .challenge-title{font-size:clamp(28px,4vw,48px);color:var(--accent);margin-bottom:12px}
+  .question{font-size:clamp(18px,3vw,30px);font-weight:900;margin:18px 0}
+  .answers{display:grid;grid-template-columns:1fr;gap:12px}
+  .answer{ background:white;color:#24324a;border:5px solid #6b421f;border-radius:14px;padding:12px;font-size:18px;font-weight:900;cursor:pointer}
+  .answer:hover{background:#fff1a6}
+  .feedback{font-size:clamp(24px,5vw,48px);font-weight:1000;margin:12px 0}
+  .correct{color:#7dff65;text-shadow:3px 3px #1d5b20}
+  .wrong{color:#ff6969;text-shadow:3px 3px #681818}
+  .coins{font-size:26px;color:var(--accent);font-weight:1000}
+  .footer-note{ position:absolute;bottom:15px;left:0;right:0;text-align:center;font-size:13px;opacity:.9;z-index:25}
+  @media(max-width:650px){.rules{grid-template-columns:1fr}.panel{padding:18px}.level{width:70px;height:70px}.l1{left:8%}.l2{left:39%}.l3{left:70%}}
+</style>
+</head>
+<body>
+<div id="game" aria-live="polite">
+
+  <!-- Top cover to hide unwanted Canva text area -->
+  <div class="canva-cover" role="note" aria-hidden="false">
+    <div style="flex:1"></div>
+    <small>ENGLISH QUEST AI • THE ENGLISH ADVENTURE</small>
+  </div>
+
+  <!-- START -->
+  <section class="slide active" id="s1" data-bg="assets/mario_bg.jpg" aria-label="Start screen">
+    <div class="hud" aria-hidden="false">
+      <div class="hud-box" id="hud-lives">❤️❤️❤️ LIVES</div>
+      <div class="hud-box" id="hud-coins">🪙 000</div>
+      <div class="hud-box" id="hud-world">WORLD 1</div>
+    </div>
+    <div class="title">ENGLISH QUEST AI</div>
+    <div class="subtitle">THE ENGLISH ADVENTURE</div>
+    <div class="hero" aria-hidden="true">🧑‍🚀</div>
+    <div class="mission">WELCOME, ENGLISH EXPLORER!<br>Mission: Learn English, complete challenges and collect coins.</div>
+    <button class="btn center-btn" aria-label="Start game" onclick="go('s2')">▶ START GAME</button>
+  </section>
+
+  <!-- HOW TO PLAY -->
+  <section class="slide" id="s2" aria-label="How to play">
+    <div class="panel">
+      <h1>🎮 HOW TO PLAY</h1>
+      <div class="rules" role="list">
+        <div class="rule" role="listitem">🧠 READ<br><br>Understand the English challenge.</div>
+        <div class="rule" role="listitem">🎯 CHOOSE<br><br>Select the best answer.</div>
+        <div class="rule" role="listitem">🪙 REWARD<br><br>Correct answers help you advance.</div>
+      </div>
+      <button class="btn" onclick="go('s3')">▶ CONTINUE</button>
+    </div>
+  </section>
+
+  <!-- WORLD MAP -->
+  <section class="slide" id="s3" aria-label="World map">
+    <div class="world-title">🌿 WORLD 1 — ACTION GRASSLAND</div>
+    <div class="path"></div>
+    <div class="level l1" role="button" tabindex="0" onclick="go('s4')">1<small>Recognize</small></div>
+    <div class="level l2" role="button" tabindex="0" onclick="go('s4')">2<small>Build</small></div>
+    <div class="level l3" role="button" tabindex="0" onclick="go('s4')">3<small>Create</small></div>
+    <div class="footer-note">Choose a level to begin your English mission.</div>
+  </section>
+
+  <!-- CHALLENGE -->
+  <section class="slide" id="s4" aria-label="Challenge 1">
+    <div class="hud" aria-hidden="true">
+      <div class="hud-box" id="hud-lives-2">❤️❤️❤️</div><div class="hud-box" id="hud-coins-2">🪙 000</div><div class="hud-box">WORLD 1</div>
+    </div>
+    <div class="panel">
+      <div class="challenge-title">🎯 CHALLENGE 01</div>
+      <div class="question">What is the character doing?</div>
+      <div class="answers">
+        <button class="answer" onclick="answer('A')">A. He plays football.</button>
+        <button class="answer" onclick="answer('B')">B. He is playing football.</button>
+        <button class="answer" onclick="answer('C')">C. He played football.</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- WRONG -->
+  <section class="slide" id="s5" aria-label="Wrong answer">
+    <div class="panel">
+      <div class="feedback wrong">💥 OOPS!</div>
+      <p style="font-size:20px;font-weight:900">Look at the action. It is happening now.</p>
+      <p style="font-size:18px">Try again and choose the form that describes an action happening at the moment.</p>
+      <button class="btn" onclick="go('s4')">🔄 TRY AGAIN</button>
+    </div>
+  </section>
+
+  <!-- CORRECT -->
+  <section class="slide" id="s6" aria-label="Correct answer">
+    <div class="panel">
+      <div class="feedback correct">🎉 CORRECT!</div>
+      <div class="coins">🪙 +10 COINS</div>
+      <p style="font-size:18px;font-weight:900">Excellent! “He is playing football” uses the Present Continuous.</p>
+      <button class="btn" onclick="nextAfterCorrect()">⭐ CONTINUE</button>
+    </div>
+  </section>
+
+  <!-- REWARD -->
+  <section class="slide" id="s7" aria-label="Mission complete">
+    <div class="panel">
+      <h1>🏆 MISSION COMPLETE!</h1>
+      <div style="font-size:60px">🪙 ⭐ 🪙</div>
+      <p style="font-size:18px;font-weight:900">You completed the first English challenge.</p>
+      <p style="font-size:16px">Reward: <strong>+10 coins</strong></p>
+      <button class="btn" onclick="go('s8')">▶ NEXT LEVEL</button>
+    </div>
+  </section>
+
+  <!-- END / MAP -->
+  <section class="slide" id="s8" aria-label="End screen">
+    <div class="panel">
+      <h1>🚩 READY FOR THE NEXT QUEST?</h1>
+      <p style="font-size:18px;font-weight:900">You are ready to continue your English adventure.</p>
+      <div style="font-size:50px">🌉 🏰 ⭐</div>
+      <button class="btn" onclick="go('s3')">🗺️ RETURN TO WORLD MAP</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  // Game state
+  const state = { lives: 3, coins: 0 };
+
+  // Update HUD in all visible HUD nodes
+  function updateHUD(){
+    document.querySelectorAll('#hud-lives, #hud-lives-2').forEach(n=>{
+      n.textContent = '❤️'.repeat(Math.max(0,state.lives)) + (state.lives<=0 ? ' (0)' : '') + ' LIVES';
+    });
+    const coinText = '🪙 ' + String(state.coins).padStart(3,'0');
+    document.querySelectorAll('#hud-coins, #hud-coins-2').forEach(n=>n.textContent = coinText);
+  }
+
+  // Set background images for slides that have data-bg attribute
+  function applyBackgroundForActiveSlide(activeId){
+    const active = document.getElementById(activeId);
+    const game = document.getElementById('game');
+    if(!active) return;
+    const bg = active.getAttribute('data-bg');
+    if(bg){
+      game.style.backgroundImage = `url('${bg}')`;
+      game.style.backgroundSize = 'cover';
+      game.style.backgroundPosition = 'center';
+    } else {
+      game.style.backgroundImage = '';
+      game.style.background = 'linear-gradient(#63c7f5 0 62%,#79c943 62% 100%)';
+    }
+  }
+
+  // Slide navigation
+  function go(id){
+    document.querySelectorAll('.slide').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    applyBackgroundForActiveSlide(id);
+    updateHUD();
+    window.scrollTo(0,0);
+  }
+
+  // Answer handling (simple demo: only B is correct)
+  function answer(choice){
+    if(choice === 'B'){
+      // correct
+      state.coins += 10;
+      updateHUD();
+      go('s6');
+    } else {
+      // wrong
+      state.lives = Math.max(0, state.lives - 1);
+      updateHUD();
+      go('s5');
+    }
+  }
+
+  function nextAfterCorrect(){
+    go('s7');
+  }
+
+  // Initialize
+  document.addEventListener('DOMContentLoaded', ()=>{
+    updateHUD();
+    // apply bg for the initially active slide
+    const active = document.querySelector('.slide.active');
+    if(active) applyBackgroundForActiveSlide(active.id);
+  });
+
+  // Keyboard accessibility: Enter on level buttons & space/enter on answers
+  document.addEventListener('keydown', (e)=>{
+    const active = document.querySelector('.slide.active');
+    if(!active) return;
+    if(e.key === 'Enter' || e.key === ' '){
+      // try to click first focusable element
+      const el = active.querySelector('button, [role="button"]');
+      if(el) el.click();
+    }
+  });
+</script>
+</body>
+</html>
