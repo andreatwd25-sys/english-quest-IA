@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ENGLISH QUEST AI — Interactive Prototype</title>
+<style>
+  :root{
+    --accent:#ffd83d;
+    --accent-2:#ffb347;
+    --bg1:#63c7f5;
+    --panel-bg:rgba(12,18,35,0.86);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Helvetica,Arial,sans-serif;background:linear-gradient(var(--bg1),#79c943);height:100vh;overflow:hidden;color:#fff}
+  #game{width:100vw;height:100vh;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  /* background image if present */
+  .bg-img{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.9);z-index:0}
+  /* HUD small */
+  .hud{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;z-index:40;pointer-events:none}
+  .hud-left, .hud-right{display:flex;gap:10px;align-items:center;pointer-events:auto}
+  .hud-box{background:var(--panel-bg);padding:8px 12px;border-radius:12px;border:3px solid rgba(255,255,255,0.08);font-weight:800;display:flex;gap:8px;align-items:center}
+  .hud .btn{font-size:14px;padding:6px 10px;border-radius:10px;border:none;cursor:pointer}
+  /* Stage */
+  .stage{position:relative;width:min(1100px,96vw);height:min(620px,86vh);background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.12));border-radius:18px;border:6px solid rgba(255,255,255,0.04);box-shadow:0 20px 40px rgba(0,0,0,0.45);z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:hidden}
+  /* top area (scene) */
+  .scene{position:relative;flex:1;width:100%;display:flex;align-items:center;justify-content:center}
+  .actor-wrap{position:relative;width:420px;height:320px;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
+  .actor{
+    width:300px;height:auto;max-height:320px;object-fit:contain;z-index:20;transition:transform .25s ease;
+    will-change:transform;
+    filter:drop-shadow(0 14px 8px rgba(0,0,0,.45));
+  }
+  .animate-action{animation:actionMove .8s ease-in-out}
+  @keyframes actionMove{
+    0%{transform:translateY(0) rotate(0deg)}
+    30%{transform:translateY(-26px) rotate(-4deg)}
+    60%{transform:translateY(-8px) rotate(3deg)}
+    100%{transform:translateY(0) rotate(0deg)}
+  }
+  /* small overlay icons for hearts and coins near HUD */
+  .hud-icon{font-size:18px}
+  /* options row */
+  .options{width:100%;padding:18px;background:linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.12));display:flex;gap:12px;justify-content:center;align-items:center;border-top:1px solid rgba(255,255,255,0.02)}
+  .choice{
+    background:linear-gradient(180deg,#fff,#fff7d6);color:#2b2b2b;border-radius:12px;padding:10px 14px;min-width:160px;text-align:center;font-weight:900;cursor:pointer;border:6px solid #c98d2d;box-shadow:0 8px 0 rgba(0,0,0,.25);transition:transform .12s ease;
+  }
+  .choice.small{min-width:120px;padding:8px 10px;font-size:14px}
+  .choice:active{transform:translateY(4px);box-shadow:0 4px 0 rgba(0,0,0,.2)}
+  .choice.correct{border-color:#4caf50;background:linear-gradient(180deg,#e6ffea,#d4fbd2)}
+  .choice.wrong{border-color:#ff6b6b;background:linear-gradient(180deg,#ffecec,#ffd7d7)}
+  /* coin flying */
+  .flying-coin{position:fixed;width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;background:radial-gradient(circle at 30% 30%,#fff6a6 0,#ffd83d 30%,#f2b300 60%);z-index:120;pointer-events:none;animation:flyingCoin 900ms ease-out forwards}
+  @keyframes flyingCoin{0%{opacity:1;transform:translateY(0) scale(1)}70%{opacity:1;transform:translateY(-160px) scale(1.05)}100%{opacity:0;transform:translateY(-240px) scale(.6)}}
+  /* small feedback X or ✓ */
+  .big-feedback{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-size:64px;pointer-events:none;z-index:130;text-shadow:0 6px 0 rgba(0,0,0,.35)}
+  /* bottom compact controls */
+  .controls{position:absolute;right:14px;bottom:14px;z-index:50;display:flex;gap:8px}
+  .small-note{font-size:12px;opacity:.85;color:#fff;z-index:40}
+  @media(max-width:720px){
+    .actor-wrap{width:240px;height:200px}.actor{width:200px}.choice{min-width:110px}
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="bg" class="bg-img" aria-hidden="true"></div>
+
+  <div class="hud" role="region" aria-label="HUD">
+    <div class="hud-left">
+      <div class="hud-box"><span id="livesDisplay">❤️❤️❤️</span></div>
+      <div class="hud-box"><span id="coinsDisplay">🪙 000</span></div>
+    </div>
+    <div class="hud-right">
+      <div class="hud-box small-note">WORLD 1</div>
+    </div>
+  </div>
+
+  <main class="stage" role="main" aria-live="polite">
+    <div class="scene" id="scene">
+      <div class="actor-wrap" id="actorWrap">
+        <!-- actor image (change src dynamically to show action) -->
+        <img id="actor" class="actor" src="assets/placeholder_actor.png" alt="English Explorer performing action" />
+        <!-- simple visual props (optional) -->
+      </div>
+      <div id="feedback" class="big-feedback" aria-hidden="true"></div>
+    </div>
+
+    <div class="options" role="group" aria-label="Opciones">
+      <button class="choice small" id="opt1" data-index="0" aria-label="Opción 1"></button>
+      <button class="choice small" id="opt2" data-index="1" aria-label="Opción 2"></button>
+      <button class="choice small" id="opt3" data-index="2" aria-label="Opción 3"></button>
+    </div>
+
+    <div class="controls">
+      <div class="hud-box small-note">Tip: Presiona 1 2 3</div>
+    </div>
+  </main>
+</div>
+
+<script>
+/*
+  Interactive prototype:
+  - The actor image shows the action (image path given per question)
+  - Options are small buttons with short sentence choices
+  - Correct → coin animation, +coins, play sound
+  - Wrong → lose life, brief red flash, play sound
+  - Saves state in localStorage
+*/
+
+/* ----- CONFIG: questions and asset filenames ----- */
+/* Edit this array if your assets have different names. Each item:
+   { id, actor: "assets/...png", options: ["A text","B text","C text"], correctIndex: 1 }
+   actor image should visually show the action (or be an animated GIF).
+*/
+const QUESTIONS = [
+  { id: 1, actor: "assets/actions/kick.png", options: ["He plays football.", "He is playing football.", "He played football."], correctIndex: 1 },
+  { id: 2, actor: "assets/actions/read.png", options: ["She reads a book.", "She is reading a book.", "She read a book."], correctIndex: 1 },
+  { id: 3, actor: "assets/actions/sleep.png", options: ["He sleeps now.", "He is sleeping now.", "He slept."], correctIndex: 1 }
+];
+
+/* Background image (optional) */
+const BG_IMAGE = "assets/bg_grass.png";
+
+/* ----- state and DOM refs ----- */
+let state = { coins: 0, lives: 3, current: 0 };
+const actor = document.getElementById('actor');
+const actorWrap = document.getElementById('actorWrap');
+const optEls = [document.getElementById('opt1'), document.getElementById('opt2'), document.getElementById('opt3')];
+const coinsDisplay = document.getElementById('coinsDisplay');
+const livesDisplay = document.getElementById('livesDisplay');
+const feedbackEl = document.getElementById('feedback');
+const bgEl = document.getElementById('bg');
+
+/* ----- utility: preload images and check assets ----- */
+function preloadImages(list){
+  return Promise.all(list.map(src=>{
+    return new Promise((res, rej)=>{
+      const img = new Image();
+      img.onload = ()=>res({src, ok:true});
+      img.onerror = ()=>res({src, ok:false});
+      img.src = src;
+    });
+  }));
+}
+async function ensureAssets(){
+  const actorImgs = QUESTIONS.map(q=>q.actor);
+  const all = [BG_IMAGE, ...actorImgs];
+  const results = await preloadImages(all);
+  const missing = results.filter(r=>!r.ok).map(r=>r.src);
+  if(missing.length) console.warn("Missing assets (check assets folder and filenames):", missing);
+  // set background if present
+  const bgLoaded = results.find(r=>r.src===BG_IMAGE && r.ok);
+  if(bgLoaded) bgEl.style.backgroundImage = `url('${BG_IMAGE}')`;
+}
+
+/* ----- persistence ----- */
+function loadState(){
+  try{
+    const raw = localStorage.getItem('eq_state_v1');
+    if(raw) state = JSON.parse(raw);
+  }catch(e){}
+  // ensure defaults
+  state.coins = state.coins || 0;
+  state.lives = (typeof state.lives === 'number')? state.lives : 3;
+  state.current = state.current || 0;
+}
+function saveState(){ localStorage.setItem('eq_state_v1', JSON.stringify(state)); }
+
+/* ----- HUD update ----- */
+function updateHUD(){
+  coinsDisplay.textContent = '🪙 ' + String(state.coins).padStart(3,'0');
+  const hearts = '❤️'.repeat(Math.max(0,state.lives));
+  livesDisplay.textContent = hearts + (state.lives<=0 ? ' (0)' : '');
+}
+
+/* ----- feedback visuals ----- */
+function showFeedback(symbol, colorClass){
+  feedbackEl.textContent = symbol;
+  feedbackEl.style.opacity = '1';
+  feedbackEl.style.transform = 'translate(-50%,-50%) scale(1.05)';
+  feedbackEl.style.color = colorClass === 'ok' ? '#7dff65' : '#ff6b6b';
+  feedbackEl.setAttribute('aria-hidden','false');
+  setTimeout(()=>{ feedbackEl.style.opacity='0'; feedbackEl.setAttribute('aria-hidden','true'); }, 700);
+}
+
+/* ----- coin fly animation ----- */
+function spawnFlyingCoin(x=window.innerWidth/2, y=window.innerHeight/2){
+  const el = document.createElement('div');
+  el.className = 'flying-coin';
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.textContent = '🪙';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 950);
+}
+
+/* ----- simple WebAudio fx (synth) ----- */
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function beep(freq, dur=0.08, type='sine', vol=0.06){
+  ensureAudio();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.value = vol;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + dur);
+}
+function soundCorrect(){ beep(880,0.08,'sine',0.06); setTimeout(()=>beep(1320,0.09,'sine',0.05),80); }
+function soundWrong(){ beep(220,0.14,'sawtooth',0.08); setTimeout(()=>beep(180,0.12,'sawtooth',0.06),90); }
+
+/* ----- game logic: load question, handle answer ----- */
+function loadQuestion(index){
+  if(index >= QUESTIONS.length){
+    // loop or reset
+    state.current = 0;
+    saveState();
+    index = 0;
+  }
+  state.current = index;
+  const q = QUESTIONS[index];
+  // actor image -> visually shows action (no large question text)
+  actor.src = q.actor;
+  // add small animation class
+  actor.classList.remove('animate-action');
+  void actor.offsetWidth;
+  actor.classList.add('animate-action');
+  // set options (short)
+  optEls.forEach((el,i)=>{
+    el.classList.remove('correct','wrong');
+    el.disabled = false;
+    el.textContent = q.options[i];
+  });
+  saveState();
+}
+
+/* choose handler */
+function chooseOption(i, userInit=false){
+  const q = QUESTIONS[state.current];
+  if(i === q.correctIndex){
+    // correct
+    state.coins += 10;
+    updateHUD();
+    spawnFlyingCoin(window.innerWidth/2, window.innerHeight/2);
+    showFeedback('🎉', 'ok');
+    try{ if(!audioCtx) ensureAudio(); soundCorrect(); }catch(e){}
+    // mark button
+    optEls[i].classList.add('correct');
+    // disable buttons briefly
+    optEls.forEach(b=>b.disabled=true);
+    setTimeout(()=>{ loadQuestion(state.current + 1); }, 900);
+  } else {
+    // wrong
+    state.lives = Math.max(0, state.lives - 1);
+    updateHUD();
+    showFeedback('💥','bad');
+    try{ soundWrong(); }catch(e){}
+    optEls[i].classList.add('wrong');
+    optEls.forEach(b=>b.disabled=true);
+    setTimeout(()=>{ optEls.forEach(b=>b.disabled=false); }, 700);
+  }
+  saveState();
+}
+
+/* attach handlers */
+optEls.forEach((el, idx)=>{
+  el.addEventListener('click', ()=>{ chooseOption(idx, true); });
+});
+
+/* keyboard 1/2/3 */
+document.addEventListener('keydown', (e)=>{
+  if(['1','2','3'].includes(e.key)){
+    const idx = Number(e.key)-1;
+    optEls[idx].focus();
+    optEls[idx].click();
+  }
+});
+
+/* init */
+(async function init(){
+  loadState();
+  await ensureAssets();
+  updateHUD();
+  // preload actor images
+  const actorImgs = QUESTIONS.map(q=>q.actor);
+  preloadImages(actorImgs);
+  // initial background if present was set by ensureAssets()
+  // if BG not set, leave gradient
+  // load first unanswered question
+  loadQuestion(state.current || 0);
+  // resume audio on first click (for WebAudio policies)
+  document.addEventListener('click', function one(){
+    try{ if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); }catch(e){}
+    document.removeEventListener('click', one);
+  });
+})();
+</script>
+</body>
+</html>
